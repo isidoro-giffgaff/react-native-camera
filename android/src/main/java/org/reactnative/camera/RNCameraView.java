@@ -22,11 +22,6 @@ import android.os.AsyncTask;
 import com.facebook.react.bridge.*;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.google.android.cameraview.CameraView;
-import com.google.zxing.BarcodeFormat;
-import com.google.zxing.DecodeHintType;
-import com.google.zxing.MultiFormatReader;
-import com.google.zxing.Result;
-import org.reactnative.barcodedetector.RNBarcodeDetector;
 import org.reactnative.camera.tasks.*;
 import org.reactnative.camera.utils.RNFileUtils;
 import org.reactnative.facedetector.RNFaceDetector;
@@ -45,7 +40,6 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
   private Map<Promise, ReadableMap> mPictureTakenOptions = new ConcurrentHashMap<>();
   private Map<Promise, File> mPictureTakenDirectories = new ConcurrentHashMap<>();
   private Promise mVideoRecordedPromise;
-  private List<String> mBarCodeTypes = null;
   private boolean mDetectedImageInEvent = false;
 
   private ScaleGestureDetector mScaleGestureDetector;
@@ -60,26 +54,11 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
   private boolean mUseNativeZoom=false;
 
   // Concurrency lock for scanners to avoid flooding the runtime
-  public volatile boolean barCodeScannerTaskLock = false;
-  public volatile boolean faceDetectorTaskLock = false;
-  public volatile boolean googleBarcodeDetectorTaskLock = false;
   public volatile boolean textRecognizerTaskLock = false;
 
   // Scanning-related properties
-  private MultiFormatReader mMultiFormatReader;
-  private RNFaceDetector mFaceDetector;
-  private RNBarcodeDetector mGoogleBarcodeDetector;
-  private boolean mShouldDetectFaces = false;
-  private boolean mShouldGoogleDetectBarcodes = false;
-  private boolean mShouldScanBarCodes = false;
   private boolean mShouldRecognizeText = false;
   private boolean mShouldDetectTouches = false;
-  private int mFaceDetectorMode = RNFaceDetector.FAST_MODE;
-  private int mFaceDetectionLandmarks = RNFaceDetector.NO_LANDMARKS;
-  private int mFaceDetectionClassifications = RNFaceDetector.NO_CLASSIFICATIONS;
-  private int mGoogleVisionBarCodeType = RNBarcodeDetector.ALL_FORMATS;
-  private int mGoogleVisionBarCodeMode = RNBarcodeDetector.NORMAL_MODE;
-  private boolean mTrackingEnabled = true;
   private int mPaddingX;
   private int mPaddingY;
 
@@ -578,7 +557,7 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
 
   public void setShouldRecognizeText(boolean shouldRecognizeText) {
     this.mShouldRecognizeText = shouldRecognizeText;
-    setScanning(mShouldDetectFaces || mShouldGoogleDetectBarcodes || mShouldScanBarCodes || mShouldRecognizeText);
+    setScanning(mShouldRecognizeText);
   }
 
   public void onTextRecognized(WritableArray serializedData) {
@@ -629,13 +608,6 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
 
   @Override
   public void onHostDestroy() {
-    if (mFaceDetector != null) {
-      mFaceDetector.release();
-    }
-    if (mGoogleBarcodeDetector != null) {
-      mGoogleBarcodeDetector.release();
-    }
-    mMultiFormatReader = null;
     mThemedReactContext.removeLifecycleEventListener(this);
 
     // camera release can be quite expensive. Run in on bg handler
